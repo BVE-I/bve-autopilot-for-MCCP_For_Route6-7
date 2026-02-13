@@ -38,10 +38,12 @@ namespace autopilot {
         void リセット();
         void 制動操作(const 共通状態 &状態) {
             手動ブレーキ条件ならイベント発動(状態);
+            最小手動ブレーキ条件ならイベント発動(状態);
         }
         void 戸開(const 共通状態 &状態) {
             イベント発動(イベント::戸開, 状態);
             手動ブレーキ条件ならイベント発動(状態);
+            最小手動ブレーキ条件ならイベント発動(状態);
         }
         void 戸閉(const 共通状態 &状態);
         void 地上子通過(
@@ -53,6 +55,8 @@ namespace autopilot {
         bool 定位置内(m 位置) const;
         bool 発進可能(const 共通状態 &状態) const;
         bool インチング可能(const 共通状態 &状態) const;
+        bool 種別;
+        bool 判定済み;
 
         自動制御指令 出力ノッチ() const noexcept { return _出力ノッチ; }
 
@@ -73,6 +77,7 @@ namespace autopilot {
         void 最大許容誤差を設定(m 最大許容誤差);
         void 停止位置リセット時刻を設定(int 地上子値);
         void 手動ブレーキ条件ならイベント発動(const 共通状態 &状態);
+        void 最小手動ブレーキ条件ならイベント発動(const 共通状態& 状態);
         void イベント発動(イベント イベント, const 共通状態 &状態);
     };
 

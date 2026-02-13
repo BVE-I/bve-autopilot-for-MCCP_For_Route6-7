@@ -48,7 +48,6 @@ namespace autopilot {
         switch (互換モード) {
         case autopilot::互換モード型::メトロ総合:
         case autopilot::互換モード型::小田急cs_atc:
-        case autopilot::互換モード型::メトロtasc:
             return true;
         default:
             return false;

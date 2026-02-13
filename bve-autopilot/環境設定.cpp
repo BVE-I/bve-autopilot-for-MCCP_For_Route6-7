@@ -80,7 +80,7 @@ namespace autopilot
         }
 
         std::vector<稼働状態> 稼働状態列を解析(
-            const std::vector<std::wstring> &s)
+            const std::vector<std::wstring>& s)
         {
             std::vector<稼働状態> r;
             std::transform(
@@ -93,6 +93,36 @@ namespace autopilot
             while (*s != L'\0') {
                 LPWSTR s2;
                 unsigned long value = std::wcstoul(s, &s2, 0);
+                if (s2 == s) {
+                    ++s;
+                    continue;
+                }
+                values.emplace_back(value);
+                s = s2;
+            }
+            return values;
+        }
+
+        std::vector<int> instructionNotches(LPCWSTR s) {
+            std::vector<int> values;
+            while (*s != L'\0') {
+                LPWSTR s2;
+                unsigned long value = std::wcstoul(s, &s2, 0);
+                if (s2 == s) {
+                    ++s;
+                    continue;
+                }
+                values.emplace_back(value);
+                s = s2;
+            }
+            return values;
+        }
+
+        std::vector<double> maintainNotchTime(LPCWSTR s) {
+            std::vector<double> values;
+            while (*s != L'\0') {
+                LPWSTR s2;
+                double value = std::wcstod(s, &s2);
                 if (s2 == s) {
                     ++s;
                     continue;
@@ -148,6 +178,9 @@ namespace autopilot
             if (s == L"manualbrake"sv) {
                 return イベント::手動ブレーキ;
             }
+            if (s == L"minimummanualbrake"sv) {
+                return イベント::最小手動ブレーキ;
+            }
             return イベント::なし;
         }
 
@@ -159,7 +192,7 @@ namespace autopilot
             }
 
             イベント イベント = イベントを解析(end);
-            return リセット条件{イベント, static_cast<s>(遅延)};
+            return リセット条件{ イベント, static_cast<s>(遅延) };
         }
 
         // 無効なキーは std::out_of_range を投げる
@@ -231,26 +264,32 @@ namespace autopilot
     環境設定::環境設定() :
         _初期稼働状態(稼働状態::ato有効),
         _稼働状態切替順序{
-            稼働状態::ato有効, 稼働状態::tascのみ有効, 稼働状態::切},
+        稼働状態::ato有効, 稼働状態::tascのみ有効, 稼働状態::切 },
         _車両長(20),
         _ノッチ変換表{},
         _加速終了遅延(2.0_s),
         _加速度一覧{},
         _常用最大減速度(3.0_kmphps),
         _制動反応時間(0.2_s),
-        _制動最大拡張ノッチ{0},
+        _制動最大拡張ノッチ{ 0 },
         _転動防止制動割合(0.5),
         _pressure_rates{},
-        _tasc制御リセット条件{イベント::なし, 0.0_s},
-        _tasc緩解条件{イベント::手動ブレーキ, 0.0_s},
+        _tasc制御リセット条件{ イベント::なし, 0.0_s },
+        _tasc緩解条件{ イベント::手動ブレーキ, 0.0_s },
         _atc事前減速(true),
         _ato一時停止あり(false),
+        _ato非常投入時出発条件リセット(false),
         _キー割り当て{
-            {キー操作::モード切替, デフォルトキー組合せ()},
-            {キー操作::ato発進, デフォルトキー組合せ()},
-            {キー操作::tascインチング, デフォルトキー組合せ()}, },
+                {キー操作::モード切替, デフォルトキー組合せ()},
+                {キー操作::ato発進, デフォルトキー組合せ()},
+                {キー操作::tascインチング, デフォルトキー組合せ()},
+        },
         _パネル出力対象登録簿(),
-        _音声割り当て{}
+        _音声割り当て{},
+        _instructionBrakeNotches{ -1 },
+        _instructionPowerNotches{ -1 },
+        _brakeMaintainNotchTime{ -1 },
+        _powerMaintainNotchTime{ -1 }
     {
     }
 
@@ -324,7 +363,7 @@ namespace autopilot
 
         // 力行加速度
         // _加速度一覧.clear();
-        for (auto &設定 : セクション内全設定(設定ファイル名, L"acceleration")) {
+        for (auto& 設定 : セクション内全設定(設定ファイル名, L"acceleration")) {
             double 速度 = std::wcstod(設定.first.c_str(), nullptr);
             if (!(速度 >= 0.0)) {
                 continue;
@@ -366,7 +405,7 @@ namespace autopilot
             int count = std::stoi(buffer);
             if (count >= 0) {
                 _制動最大拡張ノッチ =
-                    自動制動自然数ノッチ{static_cast<unsigned>(count)};
+                    自動制動自然数ノッチ{ static_cast<unsigned>(count) };
             }
         }
 
@@ -377,10 +416,10 @@ namespace autopilot
         if (0 < size && size < buffer_size - 1) {
             double 割合 = std::wcstod(buffer, nullptr);
             if (割合 == 0.0) {
-                _転動防止制動割合 = 制動力割合{0.0}; // 負の 0 は正の 0 にする
+                _転動防止制動割合 = 制動力割合{ 0.0 }; // 負の 0 は正の 0 にする
             }
             else if (0.0 <= 割合 && 割合 <= 1.0) {
-                _転動防止制動割合 = 制動力割合{割合};
+                _転動防止制動割合 = 制動力割合{ 割合 };
             }
         }
 
@@ -390,6 +429,38 @@ namespace autopilot
             設定ファイル名);
         if (0 < size && size < buffer_size - 1) {
             _pressure_rates = 制動力割合列(buffer);
+        }
+
+        // 起動時のノッチ
+        size = GetPrivateProfileStringW(
+            L"startupNotch", L"instructionBrakeNotch", L"", buffer, buffer_size,
+            設定ファイル名);
+        if (0 < size && size < buffer_size - 1) {
+            _instructionBrakeNotches = instructionNotches(buffer);
+        }
+
+        // 起動時のノッチ
+        size = GetPrivateProfileStringW(
+            L"startupNotch", L"instructionPowerNotch", L"", buffer, buffer_size,
+            設定ファイル名);
+        if (0 < size && size < buffer_size - 1) {
+            _instructionPowerNotches = instructionNotches(buffer);
+        }
+
+        // 起動時のノッチ保持時間
+        size = GetPrivateProfileStringW(
+            L"startupNotch", L"brakeMaintainNotchTime", L"", buffer, buffer_size,
+            設定ファイル名);
+        if (0 < size && size < buffer_size - 1) {
+            _brakeMaintainNotchTime = maintainNotchTime(buffer);
+        }
+
+        // 起動時のノッチ保持時間
+        size = GetPrivateProfileStringW(
+            L"startupNotch", L"powerMaintainNotchTime", L"", buffer, buffer_size,
+            設定ファイル名);
+        if (0 < size && size < buffer_size - 1) {
+            _powerMaintainNotchTime = maintainNotchTime(buffer);
         }
 
         // TASC 制御リセット条件
@@ -424,14 +495,22 @@ namespace autopilot
             _ato一時停止あり = (buffer == L"true"sv);
         }
 
+        // ATO 出発条件リセット
+        size = GetPrivateProfileStringW(
+            L"ato", L"resetDepatureConditionsWhenEmgBrake", L"", buffer, buffer_size,
+            設定ファイル名);
+        if (0 < size && size < buffer_size - 1) {
+            _ato非常投入時出発条件リセット = (buffer == L"true"sv);
+        }
+
         // キー割り当て
-        for (auto &i : std::initializer_list<std::pair<キー操作, LPCWSTR>>
+        for (auto& i : std::initializer_list<std::pair<キー操作, LPCWSTR>>
             { {キー操作::モード切替, L"mode"},
               {キー操作::モード切替逆, L"modeback"},
               {キー操作::モード切替次, L"modenext"},
               {キー操作::モード切替前, L"modeprevious"},
               {キー操作::ato発進, L"atostart"},
-              {キー操作::tascインチング, L"inch"},})
+              {キー操作::tascインチング, L"inch"}, })
         {
             size = GetPrivateProfileStringW(
                 L"key", i.second, L"", buffer, buffer_size, 設定ファイル名);
@@ -443,15 +522,15 @@ namespace autopilot
                 try {
                     _キー割り当て[i.first] = キー組合せを解析(buffer);
                 }
-                catch (const std::invalid_argument &) {
+                catch (const std::invalid_argument&) {
                 }
-                catch (const std::out_of_range &) {
+                catch (const std::out_of_range&) {
                 }
             }
         }
 
         // パネル出力対象
-        for (auto &設定 : セクション内全設定(設定ファイル名, L"panel")) {
+        for (auto& 設定 : セクション内全設定(設定ファイル名, L"panel")) {
             try {
                 int index = std::stoi(設定.first);
                 if (index < 0 || 256 <= index) {
@@ -460,14 +539,14 @@ namespace autopilot
                 _パネル出力対象登録簿.insert_or_assign(
                     index, パネル出力対象::対象(設定.second));
             }
-            catch (const std::invalid_argument &) {
+            catch (const std::invalid_argument&) {
             }
-            catch (const std::out_of_range &) {
+            catch (const std::out_of_range&) {
             }
         }
 
         // 音声出力対象
-        for (auto &i : std::initializer_list<std::pair<音声, LPCWSTR>>
+        for (auto& i : std::initializer_list<std::pair<音声, LPCWSTR>>
             { {音声::tasc無効設定音, L"tascdisabled"},
               {音声::ato無効設定音, L"atodisabled"},
               {音声::ato有効設定音, L"atoenabled"},

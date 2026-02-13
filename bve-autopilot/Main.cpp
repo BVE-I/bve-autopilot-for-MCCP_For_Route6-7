@@ -26,6 +26,7 @@
 
 namespace autopilot
 {
+    信号順守 _信号;
 
     namespace
     {
@@ -198,6 +199,15 @@ namespace autopilot
                 break;
             case キー操作::ato発進:
                 if (_ato有効) {
+                    if (_ato.状態() == ato::制御状態::停止 && _ato.発進可能(_状態, _tasc)) {
+                        if (!FirstStartUp) {
+                            Braketimer = 0;
+                            brake_s = 0;
+                        }
+                        Powertimer = 0;
+                        power_s = 0;
+                        FirstStartUp = true;
+                    }
                     _ato.発進(_状態, _tasc, ato::発進方式::手動);
                     _音声状態[音声::ato発進音].次に出力(ATS_SOUND_PLAY);
                 }
@@ -227,17 +237,6 @@ namespace autopilot
         _状態.経過(状態);
         地上子通過執行(直前位置);
         
-        // ATO 自動発進
-        if (_ato有効 && _状態.自動発進可能な時刻である()) {
-            _ato.発進(_状態, _tasc, ato::発進方式::自動);
-        }
-        /*
-        //ATO PI依存発進
-        if (出力値[103] == 1 && 出力値[73] == 1 && 出力値[92] != 7 && 出力値[137] == 0) {
-            _ato.発進(_状態, _tasc, ato::発進方式::手動);
-            _音声状態[音声::ato発進音].次に出力(ATS_SOUND_PLAY);
-        }*/
-
         // TASC インチング状態更新
         if (_インチング状態 == インチング状態::発進 && !_状態.停車中()) {
             _インチング状態 = インチング状態::走行;
@@ -247,38 +246,71 @@ namespace autopilot
         }
 
         _tasc.経過(_状態);
-        _ato.経過(_状態, _tasc);
+        _ato.経過(_状態, _tasc, FirstStartUp);
 
         // TASC と ATO の出力ノッチをまとめる
         自動制御指令 自動ノッチ = _状態.最大力行ノッチ();
-        //if (tasc有効()) {
-        if (出力値[73] == 1 && ((出力値[72] != 1 && 出力値[19] == true) || 出力値[20] == true || 出力値[21] == true || 出力値[41] == true || 出力値[35] == true)) {//TASCCgS有効、ATO/TASC切換NFBオン、キーは小田急でない
-            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
-            _ato有効 = false;
-            _tasc有効 = true;
-            //tasc状態2 = 1;
-            //tasc有効();
-            //!ato有効();
+        // 6・7統合用
+        // 通過設定
+        if (出力値[152] == 2 || 出力値[152] == 7 || 出力値[152] == 8 || 出力値[152] == 10 || 出力値[152] == 11 || 出力値[152] == 11 || 出力値[152] == 13 || 出力値[152] == 21 || 出力値[152] == 23) {
+            _tasc.種別 = true;
         }
-        //if (ato有効()) {
-        if (出力値[73] == 1 && 出力値[92] != 7 && 出力値[72] == 1 && 出力値[19] == true) {//TASCCgS有効、ATO/TASC切換NFBオフ、キーは小田急でない
-            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
-            自動ノッチ = std::min(自動ノッチ, _ato.出力ノッチ());
-            //_稼働状態 = tasc()._tasc();
-            //tasc有効();
-            _ato有効 = true;
-            _tasc有効 = true;
-            //tasc状態2 = 2;
-            //ato有効();
+        else {
+            _tasc.種別 = false;
         }
-        if(出力値[73] == 0 || 出力値[92] == 0 || (出力値[19] == false && 出力値[20] == false && 出力値[21] == false && 出力値[41] == false && 出力値[35] == false)) {//小田急キーorCgS無効or保安装置切
+        if (出力値[73] == 0 || 出力値[92] == 0 || (出力値[24] == 1 || 出力値[27] == 1) || _状態.入力逆転器ノッチ() != 1) {
             _ato有効 = false;
             _tasc有効 = false;
-            //tasc状態2 = 3;
+        }
+        else if (出力値[73] == 1 && (出力値[92] == 1 || 出力値[92] == 4) && !(出力値[24] == 1 || 出力値[27] == 1)) {//TASCCgS有効かつKeyが東急or相鉄かつ非常運転無効
+            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
+            _ato有効 = false;
+            _tasc有効 = true;
+        }
+        else if (出力値[73] == 1 && !(出力値[92] == 1 || 出力値[92] == 4) && !(出力値[24] == 1 || 出力値[27] == 1)) {//TASCCgS有効かつKeyが南北or都営/埼玉かつ非常運転無効
+            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
+            自動ノッチ = std::min(自動ノッチ, _ato.出力ノッチ());
+            _ato有効 = true;
+            _tasc有効 = true;
+        }
+        // 西武6000用
+        /*if (出力値[73] == 0 || 出力値[160] == 0 || (出力値[24] == 1 || 出力値[27] == 1)) {
+            _ato有効 = false;
+            _tasc有効 = false;
+        }
+        else if (出力値[73] == 1 && !(出力値[160] == 3) && !(出力値[24] == 1 || 出力値[27] == 1)) {//TASCCgS有効かつKeyが東急or相鉄かつ非常運転無効
+            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
+            _ato有効 = false;
+            _tasc有効 = true;
+        }
+        else if (出力値[73] == 1 && (出力値[160] == 3) && !(出力値[24] == 1 || 出力値[27] == 1)) {//TASCCgS有効かつKeyが南北or都営/埼玉かつ非常運転無効
+            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
+            自動ノッチ = std::min(自動ノッチ, _ato.出力ノッチ());
+            _ato有効 = true;
+            _tasc有効 = true;
+        }*/
+        // 17000用
+        /*if (出力値[73] == 0 || 出力値[56] != 0 || (出力値[24] == 1 || 出力値[27] == 1)) {
+            _ato有効 = false;
+            _tasc有効 = false;
+        }
+        else if (出力値[73] == 1 && !(出力値[92] == 2) && !(出力値[24] == 1 || 出力値[27] == 1)) {//TASCCgS有効かつKeyが東急or相鉄かつ非常運転無効
+            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
+            _ato有効 = false;
+            _tasc有効 = true;
+        }
+        else if (出力値[73] == 1 && (出力値[92] == 2) && !(出力値[24] == 1 || 出力値[27] == 1)) {//TASCCgS有効かつKeyが南北or都営/埼玉かつ非常運転無効
+            自動ノッチ = std::min(自動ノッチ, _tasc.出力ノッチ());
+            自動ノッチ = std::min(自動ノッチ, _ato.出力ノッチ());
+            _ato有効 = true;
+            _tasc有効 = true;
+        }*/
+        // 非常ブレーキ投入でリセット
+        if (_状態.入力制動ノッチ().value == _状態.車両仕様().BrakeNotches + 1) {
+            _ato.出発条件リセット(_状態);
         }
 
         if (!ato有効() && !インチング中() ||
-        //if ((出力値[73] == 0 || 出力値[92] == 7 || 出力値[137] == 1) && !インチング中() ||
             _状態.入力制動ノッチ() > 手動制動自然数ノッチ{0} ||
             _状態.入力逆転器ノッチ() <= 0)
         {
@@ -290,16 +322,52 @@ namespace autopilot
         }
 
         ATS_HANDLES ハンドル位置{};
-        ハンドル位置.Brake = 出力制動指令(
-            _状態.入力制動ノッチ(), 自動ノッチ.制動成分(), _状態.制動()).value;
-        if (_状態.入力力行ノッチ() >= 0) {
-            ハンドル位置.Power = std::max(
-                static_cast<int>(自動ノッチ.力行成分().value),
-                変換済入力力行ノッチ(_状態));
+
+        // 起動ノッチ進段論理
+        g_deltaT = 状態.Time - CurrentTime;
+        Braketimer += g_deltaT;
+        Powertimer += g_deltaT;
+        CurrentTime = 状態.Time;
+
+        std::vector<double> brakeMaintainNotchTime = _状態.設定().brakeMaintainNotchTime();
+        std::vector<double> powerMaintainNotchTime = _状態.設定().powerMaintainNotchTime();
+        std::vector<int> instructionBrakeNotches = _状態.設定().instructionBrakeNotches();
+        std::vector<int> instructionPowerNotches = _状態.設定().instructionPowerNotches();
+
+        if (brakeMaintainNotchTime[brake_s] == -1)StartUpBrakeNotch = -1;
+        else StartUpBrakeNotch = instructionBrakeNotches[brake_s];
+        if (brakeMaintainNotchTime[brake_s] == -1);
+        else if (Braketimer >= brakeMaintainNotchTime[brake_s])brake_s++;
+
+        if (instructionPowerNotches[power_s] == -1)StartUpPowerNotch = -1;
+        else  StartUpPowerNotch = instructionPowerNotches[power_s];
+        if (powerMaintainNotchTime[power_s] == -1);
+        else if (Powertimer >= powerMaintainNotchTime[power_s])power_s++;
+
+        if (ato有効() && StartUpBrakeNotch != -1) {
+            ハンドル位置.Brake = 出力制動指令(
+                _状態.入力制動ノッチ(), static_cast<自動制動自然数ノッチ>(StartUpBrakeNotch), _状態.制動()).value;
+        }
+        else {
+            ハンドル位置.Brake = 出力制動指令(
+                _状態.入力制動ノッチ(), 自動ノッチ.制動成分(), _状態.制動()).value;
+        }
+
+        if (_状態.入力力行ノッチ() >= 0 ) {
+            if (出力制動指令(_状態.入力制動ノッチ(), 自動ノッチ.制動成分(), _状態.制動()).value > 0)ハンドル位置.Power = 0;
+            else if (ato有効()) {
+                if (StartUpPowerNotch != -1) {
+                    if (_状態.車両仕様().PowerNotches < _状態.最大力行ノッチ().value)ハンドル位置.Power = std::min(StartUpPowerNotch + _状態.車両仕様().PowerNotches, static_cast<int>(自動ノッチ.力行成分().value));
+                    else ハンドル位置.Power = std::min(StartUpPowerNotch, static_cast<int>(自動ノッチ.力行成分().value));
+                }
+                else ハンドル位置.Power = static_cast<int>(自動ノッチ.力行成分().value);
+            }
+            else ハンドル位置.Power = std::max(static_cast<int>(自動ノッチ.力行成分().value), 変換済入力力行ノッチ(_状態));
         }
         else {
             ハンドル位置.Power = _状態.入力力行ノッチ();
         }
+
         ハンドル位置.Reverser = _状態.入力逆転器ノッチ();
         ハンドル位置.ConstantSpeed = ATS_CONSTANTSPEED_CONTINUE;
 

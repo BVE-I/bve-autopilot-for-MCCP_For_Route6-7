@@ -75,7 +75,7 @@ namespace autopilot
         }
         void 地上子通過(
             const ATS_BEACONDATA &地上子, m 直前位置, const 共通状態 &状態);
-        void 経過(const 共通状態 &状態, const tasc &tasc状態);
+        void 経過(const 共通状態 &状態, const tasc &tasc状態, bool);
 
         mps 現在制限速度(const 共通状態 &状態) const;
         mps 現在常用パターン速度(const 共通状態 &状態) const;
@@ -89,6 +89,9 @@ namespace autopilot
         制御状態 状態() const noexcept { return _制御状態; }
         自動制御指令 出力ノッチ() const noexcept { return _出力ノッチ; }
 
+        void 出発条件リセット(const 共通状態& 状態);
+
+        bool 停止現示変化 = false;
     private:
         制限グラフ _制限速度1006, _制限速度1007,
             _制限速度6, _制限速度8, _制限速度9, _制限速度10;

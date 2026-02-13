@@ -118,15 +118,22 @@ namespace autopilot
         mps 現在制限速度(const 共通状態 &状態) const;
         mps 現在常用パターン速度(const 共通状態 &状態) const;
 
+        mps 現在信号速度() const {
+            return _現在信号速度;
+        }
     private:
         std::map<信号インデックス, mps> _信号速度表;
-        閉塞型 _現在閉塞;
         std::deque<閉塞型> _前方閉塞一覧;
+        閉塞型 _現在閉塞;
+
+        mps _現在信号速度;
 
         // どうせ tasc目標停止位置変化 がすぐ呼ばれるので初期値は何でも良い
         m _tasc目標停止位置 = {};
 
         bool _atc事前減速 = true;
+
+        bool ATCブレーキ動作;
 
         // 経過メソッドが呼ばれる度に毎回制限グラフを計算するのはメモリに
         // 優しくないので予め計算しておく

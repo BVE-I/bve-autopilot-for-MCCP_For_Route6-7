@@ -55,6 +55,7 @@ namespace autopilot
         mps 現在常用パターン速度(const 共通状態 &状態) const;
 
         自動制御指令 出力ノッチ(const 共通状態 &状態) const;
+        自動制御指令 信号出力ノッチ(const 共通状態& 状態, bool) const;
 
     private:
         struct 制限区間;

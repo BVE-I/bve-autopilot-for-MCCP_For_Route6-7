@@ -82,6 +82,7 @@ namespace autopilot
         void 戸閉() {
             _状態.戸閉(true);
             _tasc.戸閉(_状態);
+            FirstStartUp = false;
         }
         void 戸開() noexcept{
             _状態.戸閉(false);
@@ -111,6 +112,18 @@ namespace autopilot
         インチング状態 _インチング状態;
         std::vector<ATS_BEACONDATA> _通過済地上子;
         std::unordered_map<音声, 音声出力> _音声状態;
+
+        int CurrentTime;
+        double g_deltaT;
+
+        bool FirstStartUp;
+        double Braketimer;
+        double Powertimer;
+
+        int StartUpBrakeNotch;
+        int StartUpPowerNotch;
+        int brake_s = 0;
+        int power_s = 0;
 
         void モード切替(bool 順方向, bool ループ);
         void 地上子通過執行(m 直前位置);

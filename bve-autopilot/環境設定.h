@@ -53,6 +53,7 @@ namespace autopilot
         停止,
         戸開,
         手動ブレーキ,
+        最小手動ブレーキ,
     };
 
     struct リセット条件 {
@@ -103,6 +104,20 @@ namespace autopilot
         const std::vector<制動力割合> &pressure_rates() const noexcept {
             return _pressure_rates;
         }
+
+        const std::vector<double>& brakeMaintainNotchTime() const noexcept {
+            return _brakeMaintainNotchTime;
+        }
+        const std::vector<double>& powerMaintainNotchTime() const noexcept {
+            return _powerMaintainNotchTime;
+        }
+        const std::vector<int>& instructionBrakeNotches() const noexcept {
+            return _instructionBrakeNotches;
+        }
+        const std::vector<int>& instructionPowerNotches() const noexcept {
+            return _instructionPowerNotches;
+        }
+
         const リセット条件 &tasc制御リセット条件() const noexcept {
             return _tasc制御リセット条件;
         }
@@ -117,6 +132,7 @@ namespace autopilot
         }
         bool atc事前減速() const noexcept { return _atc事前減速; }
         bool ato一時停止あり() const noexcept { return _ato一時停止あり; }
+        bool ato非常投入時出発条件リセット() const noexcept { return _ato非常投入時出発条件リセット; }
 
         const std::unordered_map<キー操作, キー組合せ> &キー割り当て() const
             noexcept
@@ -149,7 +165,13 @@ namespace autopilot
         制動力割合 _転動防止制動割合;
         std::vector<制動力割合> _pressure_rates;
         リセット条件 _tasc制御リセット条件, _tasc緩解条件;
-        bool _atc事前減速, _ato一時停止あり;
+        bool _atc事前減速, _ato一時停止あり, _ato非常投入時出発条件リセット;
+
+        std::vector<int> _instructionBrakeNotches;
+        std::vector<int> _instructionPowerNotches;
+        std::vector<double> _brakeMaintainNotchTime;
+        std::vector<double> _powerMaintainNotchTime;
+
 
         std::unordered_map<キー操作, キー組合せ> _キー割り当て;
         std::unordered_map<int, パネル出力対象> _パネル出力対象登録簿;

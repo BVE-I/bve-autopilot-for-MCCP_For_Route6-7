@@ -54,18 +54,18 @@ namespace autopilot {
         _力行をやめた時刻 = static_cast<時刻>(-s::無限大());
     }
 
-    void 共通状態::車両仕様設定(const ATS_VEHICLESPEC & 仕様)
+    void 共通状態::車両仕様設定(const ATS_VEHICLESPEC& 仕様)
     {
         _車両仕様 = 仕様;
         _力行特性.性能設定(
-            _設定.加速度一覧(),
-            力行ノッチ{static_cast<unsigned>(仕様.PowerNotches)});
+        _設定.加速度一覧(),
+        力行ノッチ{ static_cast<unsigned>(仕様.PowerNotches) });
         _制動特性.性能設定(
-            手動制動自然数ノッチ{static_cast<unsigned>(仕様.BrakeNotches)},
-            _設定.制動最大拡張ノッチ(),
-            _設定.常用最大減速度(),
-            _設定.制動反応時間(),
-            _設定.pressure_rates());
+        手動制動自然数ノッチ{ static_cast<unsigned>(仕様.BrakeNotches) },
+        _設定.制動最大拡張ノッチ(),
+        _設定.常用最大減速度(),
+        _設定.制動反応時間(),
+        _設定.pressure_rates());
         _勾配グラフ.列車長を設定(列車長());
     }
 
