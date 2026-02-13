@@ -114,6 +114,5 @@ Bve trainsim 5.8.7554.391 ~~および BVE Trainsim 6.0.7554.619~~ で動作確�
 
 ## 質問・問い合わせ
 
-- [ツイッター](https://twitter.com/16000land)で
-- [メール](chiyoda16122@gmail.com)で
-- [Issues](https://github.com/susLine2320/bve-autopilot-S/issues/new) で
+- [ツイッター](https://twitter.com/BVE_i_)で
+- [Issues](https://github.com/BVE-I/bve-autopilot-for-MCCP_For_Route6-7/issues/new) で
